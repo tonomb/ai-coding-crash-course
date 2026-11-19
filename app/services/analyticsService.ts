@@ -13,6 +13,12 @@ import {
   users,
 } from "~/db/schema";
 import type { AnalyticsScope } from "~/lib/analytics-scope";
+import {
+  COURSE_SORT_COLUMNS,
+  type AnalyticsRange,
+  type CourseSortColumn,
+  type SortDir,
+} from "~/lib/analytics-options";
 
 // ─── Analytics Service ───
 // Read-only numbers for the analytics pages. Receives an already-resolved scope
@@ -30,19 +36,6 @@ import type { AnalyticsScope } from "~/lib/analytics-scope";
 // Uses positional parameters (project convention).
 
 export const PLATFORM_FEE_RATE = 0.2;
-
-export const ANALYTICS_RANGES = ["30d", "90d", "all"] as const;
-export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
-
-export const COURSE_SORT_COLUMNS = [
-  "title",
-  "students",
-  "sales",
-  "earned",
-  "progress",
-] as const;
-export type CourseSortColumn = (typeof COURSE_SORT_COLUMNS)[number];
-export type SortDir = "asc" | "desc";
 
 const DEFAULT_SORT: CourseSortColumn = "sales";
 const DEFAULT_DIR: SortDir = "desc";

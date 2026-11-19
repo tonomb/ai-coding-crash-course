@@ -27,12 +27,12 @@ import type { Route } from "./+types/instructor.analytics";
 import { requireUserId } from "~/lib/access.server";
 import { resolveAnalyticsScope } from "~/lib/analytics-scope";
 import { getUserById } from "~/services/userService";
+import { getAnalyticsOverview } from "~/services/analyticsService";
 import {
   ANALYTICS_RANGES,
-  getAnalyticsOverview,
   type AnalyticsRange,
   type CourseSortColumn,
-} from "~/services/analyticsService";
+} from "~/lib/analytics-options";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -334,6 +334,17 @@ function EnrollmentChart() {
                 />
                 <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={32} />
                 <Tooltip
+                  // recharts defaults to a white box and a light-grey cursor,
+                  // which are unreadable in dark mode — follow the theme.
+                  cursor={{ fill: "var(--color-muted)" }}
+                  contentStyle={{
+                    background: "var(--color-popover)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 6,
+                    fontSize: 12,
+                  }}
+                  labelStyle={{ color: "var(--color-popover-foreground)" }}
+                  itemStyle={{ color: "var(--color-popover-foreground)" }}
                   labelFormatter={(label) =>
                     range === "30d"
                       ? formatBucketDate(String(label))
