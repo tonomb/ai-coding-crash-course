@@ -26,6 +26,8 @@ import type { AnalyticsScope } from "~/lib/analytics-scope";
 // - The cohort is the enrollments whose enrolledAt falls in the range. New
 //   students, avg progress, % finished and retention all describe the cohort.
 // - Draft courses are excluded from every number.
+//
+// Uses positional parameters (project convention).
 
 export const PLATFORM_FEE_RATE = 0.2;
 
@@ -89,6 +91,11 @@ function scopeFilter(scope: AnalyticsScope) {
     : undefined;
 }
 
+/** Published and archived courses within the scope — what analytics counts. */
+function visibleCourses(scope: AnalyticsScope) {
+  return and(inArray(courses.status, ANALYTICS_STATUSES), scopeFilter(scope));
+}
+
 // ─── Course rows ───
 
 function getCourseRows(
@@ -122,7 +129,7 @@ function getCourseRows(
     .select({
       userId: lessonProgress.userId,
       courseId: modules.courseId,
-      completed: sql<number>`count(*)`.as("completed_count"),
+      completed: sql<number>`count(distinct ${lessonProgress.lessonId})`.as("completed_count"),
     })
     .from(lessonProgress)
     .innerJoin(lessons, eq(lessons.id, lessonProgress.lessonId))
@@ -190,7 +197,7 @@ function getCourseRows(
     .innerJoin(users, eq(users.id, courses.instructorId))
     .leftJoin(sales, eq(sales.courseId, courses.id))
     .leftJoin(cohort, eq(cohort.courseId, courses.id))
-    .where(and(inArray(courses.status, ANALYTICS_STATUSES), scopeFilter(scope)))
+    .where(visibleCourses(scope))
     .orderBy(order(sortExpressions[sort]), asc(courses.id))
     .all();
 }
@@ -273,11 +280,7 @@ function getEnrollmentSeries(
     .from(enrollments)
     .innerJoin(courses, eq(courses.id, enrollments.courseId))
     .where(
-      and(
-        inArray(courses.status, ANALYTICS_STATUSES),
-        scopeFilter(scope),
-        inWindow(enrollments.enrolledAt, range, now)
-      )
+      and(visibleCourses(scope), inWindow(enrollments.enrolledAt, range, now))
     )
     .groupBy(bucket)
     .orderBy(asc(bucket))
@@ -314,21 +317,17 @@ function countDrafts(scope: AnalyticsScope) {
 
 /** Whether the scope has ever had an enrollment or a sale, on non-draft courses. */
 function getAllTimeActivity(scope: AnalyticsScope) {
-  const visibleCourses = and(
-    inArray(courses.status, ANALYTICS_STATUSES),
-    scopeFilter(scope)
-  );
   const enrollmentCount = db
     .select({ count: sql<number>`count(*)` })
     .from(enrollments)
     .innerJoin(courses, eq(courses.id, enrollments.courseId))
-    .where(visibleCourses)
+    .where(visibleCourses(scope))
     .get()!.count;
   const purchaseCount = db
     .select({ count: sql<number>`count(*)` })
     .from(purchases)
     .innerJoin(courses, eq(courses.id, purchases.courseId))
-    .where(visibleCourses)
+    .where(visibleCourses(scope))
     .get()!.count;
   return { hasEnrollments: enrollmentCount > 0, hasPurchases: purchaseCount > 0 };
 }
@@ -379,7 +378,9 @@ export function getAnalyticsOverview(
 
   const allTime = getAllTimeActivity(scope);
   const hints = {
-    noStudentsYet: rows.length > 0 && !allTime.hasEnrollments,
+    // Instructor-facing ("share your course link"); the platform shows zeros.
+    noStudentsYet:
+      scope.kind === "instructor" && rows.length > 0 && !allTime.hasEnrollments,
     noActivityInRange:
       range !== "all" &&
       totalSales === 0 &&

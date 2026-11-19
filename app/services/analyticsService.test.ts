@@ -226,6 +226,18 @@ describe("analyticsService.getAnalyticsOverview", () => {
       expect(byTitle["B"].avgProgress).toBe(50);
     });
 
+    it("counts a lesson once even if a student has duplicate progress rows for it", () => {
+      const mod = addModule(base.course.id, 1);
+      const l1 = addLesson(mod.id, "L1", 1);
+      addLesson(mod.id, "L2", 2);
+      const s = addUser();
+      enroll(s.id, base.course.id, daysAgo(1));
+      progress(s.id, l1.id, schema.LessonProgressStatus.Completed);
+      progress(s.id, l1.id, schema.LessonProgressStatus.Completed);
+
+      expect(overview().cards.avgProgress).toBe(50);
+    });
+
     it("only describes students who enrolled in the range", () => {
       const mod = addModule(base.course.id, 1);
       const lesson = addLesson(mod.id, "L1", 1);
@@ -327,6 +339,12 @@ describe("analyticsService.getAnalyticsOverview", () => {
       const result = overview("all");
       expect(result.kind).toBe("data");
       expect(result.hints).toEqual({ noStudentsYet: true, noActivityInRange: false });
+    });
+
+    it("never flags noStudentsYet on the platform view, which just shows zeros", () => {
+      const result = getAnalyticsOverview({ kind: "platform" }, "all", "sales", "desc", NOW);
+      expect(result.kind).toBe("data");
+      expect(result.hints.noStudentsYet).toBe(false);
     });
 
     it("flags noActivityInRange when the range is empty but all time is not", () => {
